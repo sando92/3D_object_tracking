@@ -37,6 +37,8 @@ _ Image index 6 to image index 7, the difference on xmin is very low, almost 2 t
 
 We can see that the boundingboxes are very close to each other, this means that the variation in distance to the ego vehicle is very low. This explain why a such high TTC is estimated.
 
+All data used for this interpretation are available in ```performance_data/FP5.pdf```.
+
 ## FP6. Performance Evaluation 2: TTC Camera
 
 We ran all detector / descriptor combinations in order to look at differences in TTC estimation. 
@@ -62,6 +64,8 @@ From Middle Term Project, we have seen that the AKAZE detector is quite slow. In
 - SIFT detector - BRIEF descriptor
 
 This combination is in top 7 without using AKAZE detector.
+
+All data used for this interpretation are available in ```performance_data/FP6.pdf```.
 
 # Dependencies
 
