@@ -1,4 +1,23 @@
-FP5. Performance Evaluation 1: TTC Lidar
+# HOW to track 3D objects and estimate Time To Collision
+
+## FP1. Match 3D objects
+
+The Yolov3 deep learning model detect objects in the scene (2D image), each detected object is enclosed in a bounding box. In order to track objects in the scene over time, we need to track those bounding boxes. By matching bounding boxes in consecutives images, we know that we are working with the same object evolving in the environment. In the preceding vehicle case, we will be able to estimate the Time To Collision because we can calculate the distance to the vehicle over time (at each frame).
+
+## FP2. Compute Lidar-based TTC
+
+Lidar measurement give us directly a measurement of distance. After filtering, segmentation and croping we can track the nearest lidar point on the preceding vehicle to estimate the TTC.
+Filtering out unwanted Lidar Points is primordial in order to reach a good estimation of the TTC. For example, in some cases lidar points pop in front of the rest of the pointcloud, this causes the distance calculation to be innacurate and thus the TTC estimation is false or way off.
+
+## FP3. Associate Keypoint Correspondences with Bounding Boxes
+
+In order to compute the Camera-based TTC, we need keypoints associated to the preceding vehicle. In other words we need to associate keypoints to regions of interest defined by bounding boxes.
+
+## FP4. Compute Camera-based TTC
+
+From keypoints detected on the preceding vehicle we can calculate for each frame the distance between all keypoints. While approaching the preceding vehicle this distance will grow over time, so the ratio of distance in current frame by the distance in previous frame will grow.
+
+## FP5. Performance Evaluation 1: TTC Lidar
 
 When is the Lidar based TTC estimate way off ?
 
@@ -18,7 +37,7 @@ _ Image index 6 to image index 7, the difference on xmin is very low, almost 2 t
 
 We can see that the boundingboxes are very close to each other, this means that the variation in distance to the ego vehicle is very low. This explain why a such high TTC is estimated.
 
-FP6. Performance Evaluation 2: TTC Camera
+## FP6. Performance Evaluation 2: TTC Camera
 
 We ran all detector / descriptor combinations in order to look at differences in TTC estimation. 
 
@@ -43,3 +62,31 @@ From Middle Term Project, we have seen that the AKAZE detector is quite slow. In
 - SIFT detector - BRIEF descriptor
 
 This combination is in top 7 without using AKAZE detector.
+
+# Dependencies
+
+- [OpenCV](https://docs.opencv.org/4.x/df/d65/tutorial_table_of_content_introduction.html)
+
+# Compile and run
+
+Retrieve the source code:
+```
+git clone https://github.com/sando92/3D_object_tracking.git
+```
+
+Create the build directory at root and enter it:
+```
+cd 3D_object_tracking
+mkdir build
+cd build
+```
+
+Compile the project:
+```
+cmake .. && make
+```
+
+And finally run it:
+```
+./3D_object_tracking
+```
