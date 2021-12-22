@@ -23,7 +23,7 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
 std::unordered_set<int> Ransac2D(std::vector<LidarPoint> &lidarPoints, int maxIterations, double distanceThreshold);
 std::vector<LidarPoint> removeOutliers(std::vector<LidarPoint> &lidarPoints, int maxIterations, float distanceThreshold);     
 
-double medianX(std::vector<LidarPoint> &lidarPoints);
-double meanX(std::vector<LidarPoint> &lidarPoints);
+std::tuple<double, double, double> quartilesOnXaxisLidarPoints(std::vector<LidarPoint> &lidarPoints);
+std::tuple<double, double, double> quartilesMatchDistance(std::vector<cv::DMatch> &matches);
 
 #endif /* camFusion_hpp */

@@ -10,15 +10,6 @@
 
 using namespace std;
 
-void print_map(string_view comment, const map<int, int>& m)
-{
-    cout << comment;
-    for (const auto& [key, value] : m) {
-        cout << key << " = " << value << "; ";
-    }
-    cout << "\n";
-}
-
 // Create groups of Lidar points whose projection into the camera falls into the same bounding box
 void clusterLidarWithROI(std::vector<BoundingBox> &boundingBoxes, std::vector<LidarPoint> &lidarPoints, float shrinkFactor, cv::Mat &P_rect_xx, cv::Mat &R_rect_xx, cv::Mat &RT)
 {
@@ -131,21 +122,38 @@ std::vector<LidarPoint> removeOutliers(std::vector<LidarPoint> &lidarPoints, int
     return lidarPointsInliers;
 }
 
-double medianX(std::vector<LidarPoint> &lidarPoints){
+std::tuple<double, double, double> quartilesOnXaxisLidarPoints(std::vector<LidarPoint> &lidarPoints){
     std::vector<double> v_x;
     for (LidarPoint lp: lidarPoints)
         v_x.push_back(lp.x);
 
-    auto m = v_x.begin() + v_x.size()/2;
-    std::nth_element(v_x.begin(), m, v_x.end());
-    return v_x[v_x.size()/2];
+    auto const Q1 = v_x.size() / 4;
+    auto const Q2 = v_x.size() / 2;
+    auto const Q3 = Q1 + Q2;
+
+    std::nth_element(v_x.begin(),          v_x.begin() + Q1, v_x.end());
+    std::nth_element(v_x.begin() + Q1 + 1, v_x.begin() + Q2, v_x.end());
+    std::nth_element(v_x.begin() + Q2 + 1, v_x.begin() + Q3, v_x.end());
+
+    return {v_x[Q1], v_x[Q2], v_x[Q3]};
 }
-double meanX(std::vector<LidarPoint> &lidarPoints){
-    double sumX;
-    for (LidarPoint lp: lidarPoints)
-        sumX += lp.x;
-    return sumX/(double)lidarPoints.size();
+
+std::tuple<double, double, double> quartilesMatchDistance(std::vector<cv::DMatch> &matches){
+    std::vector<double> v_x;
+    for (cv::DMatch match: matches)
+        v_x.push_back(match.distance);
+
+    auto const Q1 = v_x.size() / 4;
+    auto const Q2 = v_x.size() / 2;
+    auto const Q3 = Q1 + Q2;
+
+    std::nth_element(v_x.begin(),          v_x.begin() + Q1, v_x.end());
+    std::nth_element(v_x.begin() + Q1 + 1, v_x.begin() + Q2, v_x.end());
+    std::nth_element(v_x.begin() + Q2 + 1, v_x.begin() + Q3, v_x.end());
+
+    return {v_x[Q1], v_x[Q2], v_x[Q3]};
 }
+
 /* 
 * The show3DObjects() function below can handle different output image sizes, but the text output has been manually tuned to fit the 2000x2000 size. 
 * However, you can make this function work for other sizes too.
@@ -240,16 +248,18 @@ void clusterKptMatchesWithROI(BoundingBox &boundingBox, std::vector<cv::KeyPoint
 
     cout << "First step: selected " << boundingBox.kptMatches.size() << " kptsMatches !" << endl;
 
-    // Filter out outliers in Matches
-    double mean_match_dist = 0.0;
-    for (cv::DMatch match: boundingBox.kptMatches) {
-        mean_match_dist += match.distance;
-    }
-    mean_match_dist = mean_match_dist / (double)boundingBox.kptMatches.size();
+    // Filter matches by removing outliers, using Inter Quartile Range (IQR)
+    auto [Q1, Q2, Q3] = quartilesMatchDistance(boundingBox.kptMatches);
+    double IQR = Q3 - Q1;
+    double low_outlier_thold = Q1 - 1.5 * IQR;
+    double high_outlier_thold = Q3 + 1.5 * IQR;
+    cout << "Distance Median for matches is " << Q2 << endl;
+    cout << "Q1: " << Q1 << ", Q3: " << Q3 << endl;
+    cout << "IQR: " << IQR << endl;
+    cout << "low_outlier_thold: " << low_outlier_thold << ", high_outlier_thold: " << high_outlier_thold << endl;
 
-    float mean_match_dist_thold = 130.0;
     for (auto it1 = boundingBox.kptMatches.begin(); it1 != boundingBox.kptMatches.end(); it1++) {
-        if (abs( mean_match_dist - it1->distance ) > mean_match_dist_thold) {
+        if (it1->distance < low_outlier_thold && it1->distance > high_outlier_thold) {
             boundingBox.kptMatches.erase( it1 );
             it1--;
         }
@@ -320,13 +330,23 @@ void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPo
 void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
                      std::vector<LidarPoint> &lidarPointsCurr, double frameRate, double &TTC)
 {
-    float median_thold = 0.18;
-    // calculate median and mean to remove outliers
-    double median_x_lidarpointsPrev = medianX(lidarPointsPrev);
-    cout << "PrevMedian on X axis for lidarpoints is " << median_x_lidarpointsPrev << endl;
+    auto [prev_Q1, prev_Q2, prev_Q3] = quartilesOnXaxisLidarPoints(lidarPointsPrev);
+    double prev_IQR = prev_Q3 - prev_Q1;
+    double prev_low_outlier_thold = prev_Q1 - 1.5 * prev_IQR;
+    double prev_high_outlier_thold = prev_Q3 + 1.5 * prev_IQR;
+    cout << "PrevMedian on X axis for lidarpoints is " << prev_Q2 << endl;
+    cout << "prev_Q1: " << prev_Q1 << ", prev_Q3: " << prev_Q3 << endl;
+    cout << "prev_IQR: " << prev_IQR << endl;
+    cout << "prev_low_outlier_thold: " << prev_low_outlier_thold << ", prev_high_outlier_thold: " << prev_high_outlier_thold << endl;
 
-    double median_x_lidarpointsCurr = medianX(lidarPointsCurr);
-    cout << "CurrMedian on X axis for lidarpoints is " << median_x_lidarpointsCurr << endl;
+    auto [curr_Q1, curr_Q2, curr_Q3] = quartilesOnXaxisLidarPoints(lidarPointsCurr);
+    double curr_IQR = curr_Q3 - curr_Q1;
+    double curr_low_outlier_thold = curr_Q1 - 1.5 * curr_IQR;
+    double curr_high_outlier_thold = curr_Q3 + 1.5 * curr_IQR;
+    cout << "CurrMedian on X axis for lidarpoints is " << curr_Q2 << endl;
+    cout << "curr_Q1: " << curr_Q1 << ", curr_Q3: " << curr_Q3 << endl;
+    cout << "curr_IQR: " << curr_IQR << endl;
+    cout << "curr_low_outlier_thold: " << curr_low_outlier_thold << ", curr_high_outlier_thold: " << curr_high_outlier_thold << endl;
 
     // auxiliary variables
     double dT = 1.0 / frameRate;        // time between two measurements in seconds
@@ -336,7 +356,7 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
     double minXPrev = 1e9, minXCurr = 1e9;
     for (auto it = lidarPointsPrev.begin(); it != lidarPointsPrev.end(); ++it)
     {
-        if (abs(it->y) <= laneWidth / 2.0 && abs(median_x_lidarpointsPrev - it->x) < median_thold)
+        if (abs(it->y) <= laneWidth / 2.0 && it->x < prev_high_outlier_thold && it->x > prev_low_outlier_thold)
         { // 3D point within ego lane?
             minXPrev = minXPrev > it->x ? it->x : minXPrev;
         }
@@ -344,7 +364,7 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
 
     for (auto it = lidarPointsCurr.begin(); it != lidarPointsCurr.end(); ++it)
     {
-        if (abs(it->y) <= laneWidth / 2.0 && abs(median_x_lidarpointsCurr - it->x) < median_thold)
+        if (abs(it->y) <= laneWidth / 2.0 && it->x < curr_high_outlier_thold && it->x > curr_low_outlier_thold)
         { // 3D point within ego lane?
             minXCurr = minXCurr > it->x ? it->x : minXCurr;
         }
@@ -424,6 +444,4 @@ void matchBoundingBoxes(std::vector<cv::DMatch> &matches, std::map<int, int> &bb
             bbBestMatches.insert({bb.boxID, max_value});
         }
     }
-    print_map("Updated bbBestMatches map: ", bbBestMatches);
-
 }
