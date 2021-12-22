@@ -28,7 +28,7 @@ We have multiple cases, looking at consecutive estimation of the TTC, where the 
 From the image above, we can see that the outlier removal was successful. The strong variation in the TTC estimation seems to be normal, taken the chosen method and the data input.
 
 
-_ Image index 6 to image index 7, the difference on xmin is very low, almost 2 times smaller compared to previous estimation. We have a difference of 2,2cm compared to 6,6cm in average on previous estimations. In this case, a low difference estimated represents a low braking speed of the preceding vehicle and a higher TTC of 34,34 seconds. This estimation is 274% higher than the mean of previous estimations.
+- Image index 6 to image index 7, the difference on xmin is very low, almost 2 times smaller compared to previous estimation. We have a difference of 2,2cm compared to 6,6cm in average on previous estimations. In this case, a low difference estimated represents a low braking speed of the preceding vehicle and a higher TTC of 34,34 seconds. This estimation is 274% higher than the mean of previous estimations.
 
 ![Image index 6 - 7 analysis](performance_data/imgIndex6-7_analysis.png )
 
