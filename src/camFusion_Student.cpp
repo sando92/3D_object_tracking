@@ -321,6 +321,13 @@ void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPo
     long medIndex = floor(distRatios.size() / 2.0);
     double medDistRatio = distRatios.size() % 2 == 0 ? (distRatios[medIndex - 1] + distRatios[medIndex]) / 2.0 : distRatios[medIndex]; // compute median dist. ratio to remove outlier influence
 
+    if (medDistRatio == 1)
+    {
+        cout << "TTC Camera: Median distance ratio is equal to 1, no change between frame" << endl;
+        TTC = NAN;
+        return;
+    }
+
     dT = 1 / frameRate;
     TTC = -dT / (1 - medDistRatio);
     cout << "TTC Camera: Median distance ratio" << medDistRatio << endl;
