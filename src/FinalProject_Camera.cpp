@@ -78,9 +78,11 @@ int main(int argc, const char *argv[])
     std::ofstream log_file;
     log_file.open ("log.csv");
 
-    // std::vector<string> v_detector_type = {"HARRIS","FAST","BRISK","ORB","AKAZE","SIFT"};
-    std::vector<string> v_detector_type = {"SIFT"};
+    // std::vector<string> v_detector_type = {"HARRIS","FAST","BRISK","ORB"};
+    // std::vector<string> v_descriptor_type = { "BRIEF", "ORB", "FREAK", "SIFT"};
+    // std::vector<string> v_detector_type = {"AKAZE"};
     // std::vector<string> v_descriptor_type = {"BRIEF", "ORB", "FREAK", "AKAZE", "SIFT"};
+    std::vector<string> v_detector_type = {"SIFT"};
     std::vector<string> v_descriptor_type = {"BRIEF", "FREAK", "SIFT"};
 
     log_file << "FP6,,,,,,,," << endl; //l.0
@@ -99,7 +101,6 @@ int main(int argc, const char *argv[])
             for (size_t imgIndex = 0; imgIndex <= imgEndIndex - imgStartIndex; imgIndex+=imgStepWidth)
             {
                 /* LOAD IMAGE INTO BUFFER */
-                log_file << ",," << imgIndex << ",";
 
                 // assemble filenames for current index
                 ostringstream imgNumber;
@@ -295,7 +296,7 @@ int main(int argc, const char *argv[])
                             clusterKptMatchesWithROI(*currBB, (dataBuffer.end() - 1)->keypoints, (dataBuffer.end() - 1)->kptMatches);                    
                             computeTTCCamera((dataBuffer.end() - 2)->keypoints, (dataBuffer.end() - 1)->keypoints, currBB->kptMatches, sensorFrameRate, ttcCamera);
                             
-                            log_file << ttcCamera << ",,,,," << endl; // l. (nbline + imgIndex)
+                            log_file << ",," << imgIndex << "," << ttcCamera << ",,,,," << endl; // l. (nbline + imgIndex)
 
                             bVis = false;
                             if (bVis)
@@ -315,7 +316,6 @@ int main(int argc, const char *argv[])
                                 cv::waitKey(0);
                             }
                             bVis = false;
-
                         } // eof TTC computation
                     } // eof loop over all BB matches            
 
