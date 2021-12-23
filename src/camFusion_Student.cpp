@@ -138,20 +138,33 @@ std::tuple<double, double, double> quartilesOnXaxisLidarPoints(std::vector<Lidar
     return {v_x[Q1], v_x[Q2], v_x[Q3]};
 }
 
-std::tuple<double, double, double> quartilesMatchDistance(std::vector<cv::DMatch> &matches){
-    std::vector<double> v_x;
-    for (cv::DMatch match: matches)
-        v_x.push_back(match.distance);
+void filterOutliers(std::vector<cv::DMatch> &matches, std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPoint> &kptsCurr){
+    // calculate euclidean distance between keypoints in each match
+    std::vector<double> v_euclidean_distance;
+    for (cv::DMatch match: matches){
+        v_euclidean_distance.push_back( cv::norm(kptsCurr[match.trainIdx].pt - kptsPrev[match.queryIdx].pt) );
+    }
 
-    auto const Q1 = v_x.size() / 4;
-    auto const Q2 = v_x.size() / 2;
+    auto const Q1 = v_euclidean_distance.size() / 4;
+    auto const Q2 = v_euclidean_distance.size() / 2;
     auto const Q3 = Q1 + Q2;
 
-    std::nth_element(v_x.begin(),          v_x.begin() + Q1, v_x.end());
-    std::nth_element(v_x.begin() + Q1 + 1, v_x.begin() + Q2, v_x.end());
-    std::nth_element(v_x.begin() + Q2 + 1, v_x.begin() + Q3, v_x.end());
+    std::nth_element(v_euclidean_distance.begin(),          v_euclidean_distance.begin() + Q1, v_euclidean_distance.end());
+    std::nth_element(v_euclidean_distance.begin() + Q1 + 1, v_euclidean_distance.begin() + Q2, v_euclidean_distance.end());
+    std::nth_element(v_euclidean_distance.begin() + Q2 + 1, v_euclidean_distance.begin() + Q3, v_euclidean_distance.end());
 
-    return {v_x[Q1], v_x[Q2], v_x[Q3]};
+    double IQR = v_euclidean_distance[Q3] - v_euclidean_distance[Q1];
+    double low_outlier_thold = v_euclidean_distance[Q1] - 1.5 * IQR;
+    double high_outlier_thold = v_euclidean_distance[Q3] + 1.5 * IQR;
+
+    int i = 0;
+    for (double dist : v_euclidean_distance) {
+        if (dist < low_outlier_thold || dist > high_outlier_thold) {
+            matches.erase(matches.begin() + i);
+            i--;
+        }
+        i++;
+    }
 }
 
 /* 
@@ -237,7 +250,7 @@ void show3DObjects(std::vector<BoundingBox> &boundingBoxes, cv::Size worldSize, 
 
 
 // associate a given bounding box with the keypoints it contains
-void clusterKptMatchesWithROI(BoundingBox &boundingBox, std::vector<cv::KeyPoint> &kptsCurr, std::vector<cv::DMatch> &kptMatches)
+void clusterKptMatchesWithROI(BoundingBox &boundingBox, std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPoint> &kptsCurr, std::vector<cv::DMatch> &kptMatches)
 {
     //looking for matches in bounding box, if kpt at trainIdx is in roi
     for (cv::DMatch match: kptMatches){
@@ -248,22 +261,8 @@ void clusterKptMatchesWithROI(BoundingBox &boundingBox, std::vector<cv::KeyPoint
 
     cout << "First step: selected " << boundingBox.kptMatches.size() << " kptsMatches !" << endl;
 
-    // Filter matches by removing outliers, using Inter Quartile Range (IQR)
-    auto [Q1, Q2, Q3] = quartilesMatchDistance(boundingBox.kptMatches);
-    double IQR = Q3 - Q1;
-    double low_outlier_thold = Q1 - 1.5 * IQR;
-    double high_outlier_thold = Q3 + 1.5 * IQR;
-    cout << "Distance Median for matches is " << Q2 << endl;
-    cout << "Q1: " << Q1 << ", Q3: " << Q3 << endl;
-    cout << "IQR: " << IQR << endl;
-    cout << "low_outlier_thold: " << low_outlier_thold << ", high_outlier_thold: " << high_outlier_thold << endl;
-
-    for (auto it1 = boundingBox.kptMatches.begin(); it1 != boundingBox.kptMatches.end(); it1++) {
-        if (it1->distance < low_outlier_thold && it1->distance > high_outlier_thold) {
-            boundingBox.kptMatches.erase( it1 );
-            it1--;
-        }
-    }
+    // Filter matches by removing outliers, using Inter Quartile Range (IQR) on euclidean distance between keypoints of each match. 
+    filterOutliers(boundingBox.kptMatches, kptsPrev, kptsCurr);
 
     cout << "After filter step: selected " << boundingBox.kptMatches.size() << " kptsMatches !" << endl;
 
@@ -313,6 +312,7 @@ void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPo
     // only continue if list of distance ratios is not empty
     if (distRatios.size() == 0)
     {
+        cout << "TTC Camera: list of distance ratios is empty." << endl;
         TTC = NAN;
         return;
     }
